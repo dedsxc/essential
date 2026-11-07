@@ -1,0 +1,2 @@
+{{- toYaml (omit .Values "packs" "components" "bootstrap") }}
+enabled: {{ toJson (include "platform.enabled" . | fromYaml).items }}

@@ -1,0 +1,88 @@
+{{- $root := . -}}
+{{- $catalog := .Files.Get "components.yaml" | fromYaml -}}
+{{- $enabled := (include "platform.enabled" . | fromYaml).items -}}
+{{- range $name := $enabled }}
+{{- $c := index $catalog $name -}}
+{{- if not $c }}{{ fail (printf "composant inconnu: %s" $name) }}{{ end -}}
+{{- $o := index ($root.Values.components | default dict) $name | default dict -}}
+{{- $file := printf "files/%s.yaml" $name -}}
+{{- $vals := dict -}}
+{{- with $root.Files.Get $file }}{{ $vals = tpl . $root | fromYaml }}{{ end -}}
+{{- if hasKey $vals "Error" }}{{ fail (printf "%s: %s" $name $vals.Error) }}{{ end -}}
+{{- $vals = mergeOverwrite $vals (index $o "values" | default dict) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $c.wave | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ $c.ns }}
+  source:
+    {{- if $c.path }}
+    repoURL: {{ $root.Values.gitops.repoURL }}
+    targetRevision: {{ $root.Values.gitops.targetRevision }}
+    path: {{ $c.path }}
+    {{- else }}
+    repoURL: {{ $c.repo }}
+    chart: {{ $c.chart }}
+    targetRevision: {{ index $o "version" | default $c.version | quote }}
+    {{- end }}
+    helm:
+      releaseName: {{ $name }}
+      valuesObject:
+        {{- toYaml $vals | nindent 8 }}
+  {{- with $c.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff: {duration: 15s, factor: 2, maxDuration: 5m}
+    syncOptions:
+      - CreateNamespace=true
+      {{- if $c.ignoreDifferences }}
+      - RespectIgnoreDifferences=true
+      {{- end }}
+      {{- if $c.serverSide }}
+      - ServerSideApply=true
+      {{- end }}
+{{- end }}
+{{- if .Values.bootstrap }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: argocd}
+  source:
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    path: {{ .Values.gitops.path }}
+    helm:
+      releaseName: platform
+      valuesObject:
+        {{- toYaml (omit .Values "bootstrap" "packs") | nindent 8 }}
+  # ArgoCD ajoute des finalizers pre-delete quand un chart a des hooks PreDelete (ex. Onyx)
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers: [/metadata/finalizers]
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [RespectIgnoreDifferences=true]
+{{- end }}

@@ -1,0 +1,26 @@
+{{- /* Homelab load balancer with Cilium LB-IPAM + L2 announcements (no MetalLB needed).
+     Requires Cilium with l2announcements.enabled=true (and kubeProxyReplacement or externalIPs). */ -}}
+{{- with .Values.ingress.ciliumLB }}
+{{- if .enabled }}
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: kstack-pool
+  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+spec:
+  allowFirstLastIPs: "No"
+  blocks:
+    - start: {{ required "ingress.ciliumLB.start est requis (ex: 192.168.1.240)" .start | quote }}
+      stop: {{ required "ingress.ciliumLB.stop est requis (ex: 192.168.1.250)" .stop | quote }}
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: kstack-l2
+  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+spec:
+  interfaces: {{ .interfaces | default (list "^eth[0-9]+" "^eno[0-9]+" "^enp[0-9]+s[0-9]+$") | toJson }}
+  loadBalancerIPs: true
+  externalIPs: true
+{{- end }}
+{{- end }}

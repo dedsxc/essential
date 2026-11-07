@@ -1,0 +1,11 @@
+# Local PV hostpath only: works on any node (homelab, k3s, bare metal). No replication:
+# a volume lives on one node's disk. LVM/ZFS/Mayastor, Loki and Alloy are disabled.
+engines:
+  local: {lvm: {enabled: false}, zfs: {enabled: false}, rawfile: {enabled: false}, hostpath: {enabled: true}}
+  replicated: {mayastor: {enabled: false}}
+loki: {enabled: false}
+alloy: {enabled: false}
+localpv-provisioner:
+  hostpathClass:
+    basePath: /var/openebs/local
+    isDefaultClass: {{ .Values.storage.makeDefault | default false }}

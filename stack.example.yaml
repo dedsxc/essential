@@ -1,0 +1,38 @@
+# stack.yaml - source de verite de l'installation (copier en stack.yaml et adapter)
+pack: starter         # edition gratuite (ia / full: packs payants)
+domain: example.com   # sous-domaines: argocd., grafana., onyx., auth., coder.
+                      # Pas de domaine ? laisser vide: <ip>.sslip.io (IP = ingress.ciliumLB.start ou ingress.nodeIP), certificats self-signed
+gitops:
+  # Repo Git que ArgoCD surveille (fork/copie de ce repo). Prive: install.sh cree le credential.
+  repoURL: https://github.com/myorg/my-platform.git
+  targetRevision: main
+  path: charts/platform
+tls:
+  issuer: selfsigned   # selfsigned | letsencrypt-http01 | letsencrypt-dns01
+  email: admin@example.com
+  staging: false
+  dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}
+ingress:
+  className: traefik
+  serviceType: LoadBalancer   # NodePort + nodeIP (IP du serveur) en dernier recours
+  nodeIP: ""
+  # Homelab avec Cilium: IPs de load balancer annoncees en L2 sur le LAN (pas besoin de MetalLB).
+  # Prerequis: Cilium installe avec l2announcements.enabled=true. Plage hors DHCP de la box.
+  ciliumLB: {enabled: false, start: "", stop: ""}
+dns:
+  provider: none       # none | cloudflare | aws | google ... (external-dns)
+secrets:
+  provider: none       # none (generes par install.sh) | infisical (ClusterSecretStore ESO)
+  infisical: {hostAPI: https://app.infisical.com, projectSlug: kube-ia, environmentSlug: prod, credentialsSecret: infisical-universal-auth}
+storage:
+  # openebs-hostpath: volumes locaux sur le disque du noeud (homelab, k3s, bare metal)
+  # none: garder la StorageClass du cluster (EKS gp3, GKE pd, ...)
+  provider: openebs-hostpath
+  makeDefault: false   # true si le cluster n'a aucune StorageClass par defaut
+storageClass: openebs-hostpath   # vide = StorageClass par defaut du cluster
+# Cilium (option, starter inclus): CNI eBPF + remplace kube-proxy + load balancer L2 (avec ingress.ciliumLB).
+# Cluster cree SANS CNI ni kube-proxy, ex. k3s: --flannel-backend=none --disable-network-policy --disable-kube-proxy
+# install.sh l'installe avant ArgoCD (Helm), puis ArgoCD le gere.
+cilium: {k8sServiceHost: "", k8sServicePort: 6443, podCIDR: 10.42.0.0/16}
+optional: {cilium: false}
+components: {}

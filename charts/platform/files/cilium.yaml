@@ -1,0 +1,21 @@
+# Cilium (Apache-2.0): CNI eBPF, remplace kube-proxy, LB-IPAM + annonces L2 pour les Services LoadBalancer.
+kubeProxyReplacement: true
+k8sServiceHost: {{ required "cilium.k8sServiceHost est requis (IP du serveur API)" .Values.cilium.k8sServiceHost | quote }}
+k8sServicePort: {{ .Values.cilium.k8sServicePort | default 6443 }}
+ipam:
+  mode: cluster-pool
+  operator:
+    clusterPoolIPv4PodCIDRList: [{{ .Values.cilium.podCIDR | default "10.42.0.0/16" | quote }}]
+operator:
+  replicas: 1
+bpf:
+  masquerade: true
+l2announcements:
+  enabled: true
+externalIPs:
+  enabled: true
+k8sClientRateLimit: {qps: 20, burst: 40}   # recommande avec l2announcements
+hubble:
+  enabled: true
+  relay: {enabled: false}
+  ui: {enabled: false}

@@ -1,0 +1,69 @@
+# Valeurs par defaut. stack.yaml (cf. stack.example.yaml) surcharge ces cles.
+# pack: starter (cette edition gratuite). ia / full: packs payants, https://shop.kien.cc
+pack: starter
+# true uniquement pour le rendu bootstrap fait par install.sh (Application racine)
+bootstrap: false
+
+domain: example.com
+
+gitops:
+  repoURL: https://github.com/myorg/my-platform.git
+  targetRevision: main
+  path: charts/platform
+
+tls:
+  # selfsigned | letsencrypt-http01 | letsencrypt-dns01
+  issuer: selfsigned
+  email: admin@example.com
+  # staging: true pour utiliser l'ACME staging de Let's Encrypt
+  staging: false
+  dns01:
+    # cloudflare | route53 | ... (cloudflare supporte nativement)
+    provider: cloudflare
+    # Secret (ns cert-manager) contenant le token API DNS du client
+    secretName: dns01-api-token
+    secretKey: api-token
+
+ingress:
+  className: traefik
+  # Cilium LB-IPAM + L2 announcements (homelab, sans MetalLB). Requiert Cilium l2announcements.enabled=true.
+  ciliumLB: {enabled: false, start: "", stop: ""}
+
+dns:
+  # external-dns: provider (cloudflare, aws, google, ...) ou "none" pour desactiver
+  provider: none
+  secretName: external-dns-credentials
+
+secrets:
+  # infisical | none  (none = secrets crees localement par install.sh)
+  provider: none
+  infisical:
+    hostAPI: https://app.infisical.com
+    projectSlug: kube-ia
+    environmentSlug: prod
+    # Secret (ns external-secrets) avec clientId / clientSecret (universal auth)
+    credentialsSecret: infisical-universal-auth
+
+storage: {provider: none, makeDefault: false}
+storageClass: ""
+
+
+cilium:
+  k8sServiceHost: ""   # IP du serveur API Kubernetes (requis: kube-proxy remplace par Cilium)
+  k8sServicePort: 6443
+  podCIDR: 10.42.0.0/16
+
+# Composants optionnels (ajoutes au pack si true)
+optional:
+  # cilium: CNI + kube-proxy replacement + load balancer L2 (k3s / bare metal installe sans CNI)
+  cilium: false
+
+packs:
+  # starter (free) < ia < full. Each pack includes the previous one.
+  base: [traefik, cert-manager, external-dns, external-secrets, cloudnative-pg, argocd, metrics-server, platform-config, infisical]
+  ia: []    # Private AI pack (paid): https://shop.kien.cc
+  full: []  # All-In-One pack (paid)
+
+# Overrides par composant: components.<nom>.enabled=false pour forcer l'exclusion,
+# components.<nom>.values pour surcharger les values Helm, .version pour la version.
+components: {}

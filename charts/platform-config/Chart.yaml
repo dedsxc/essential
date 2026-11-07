@@ -1,0 +1,5 @@
+apiVersion: v2
+name: platform-config
+description: Ressources transverses (ClusterIssuers, ClusterSecretStore Infisical, ExternalSecrets, bases CNPG)
+type: application
+version: 0.1.0
