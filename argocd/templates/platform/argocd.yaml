@@ -1,0 +1,2 @@
+{{- /* ArgoCD manages itself: install.sh installs this same chart once with Helm, then this Application takes over. */}}
+{{ include "kstack.app" (dict "ctx" $ "name" "argocd" "ns" "argocd") }}

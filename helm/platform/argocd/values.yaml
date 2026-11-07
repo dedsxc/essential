@@ -1,0 +1,11 @@
+argo-cd:
+  configs:
+    params: {server.insecure: true}
+    cm:
+      resource.exclusions: |
+        - apiGroups: [cilium.io]
+          kinds: [CiliumIdentity]
+  server:
+    ingress: {enabled: false}   # templates/ingress.yaml (needs global.domain)
+  dex: {enabled: false}
+  notifications: {enabled: false}

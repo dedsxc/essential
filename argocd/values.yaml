@@ -1,0 +1,26 @@
+# Same keys as stack.yaml: install.sh passes your stack.yaml to the root Application.
+pack: starter
+domain: example.com
+gitops:
+  repoURL: https://github.com/myorg/my-platform.git
+  targetRevision: main
+tls:
+  issuer: selfsigned          # selfsigned | letsencrypt-http01 | letsencrypt-dns01
+  email: admin@example.com
+  staging: false
+  dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}
+ingress:
+  className: traefik
+  serviceType: LoadBalancer   # NodePort + nodeIP if the cluster has no load balancer
+  nodeIP: ""
+  ciliumLB: {enabled: false, start: "", stop: ""}
+dns:
+  provider: none              # none | cloudflare | aws | google ... (external-dns)
+  secretName: external-dns-credentials
+secrets:
+  provider: none              # none | infisical (ClusterSecretStore for External Secrets)
+  infisical: {hostAPI: https://app.infisical.com, projectSlug: my-project, environmentSlug: prod, credentialsSecret: infisical-universal-auth}
+storage: {provider: openebs-hostpath, makeDefault: false}
+storageClass: openebs-hostpath
+cilium: {k8sServiceHost: "", k8sServicePort: 6443, podCIDR: 10.42.0.0/16}
+optional: {cilium: false}

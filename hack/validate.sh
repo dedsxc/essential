@@ -1,30 +1,22 @@
 #!/usr/bin/env bash
-# Rend le chart platform puis chaque Application enfant (helm template) et valide avec kubeconform.
-# Usage: hack/validate.sh [stack.yaml] [pack...]
+# Renders argocd/ (root) with a stack.yaml, then every chart it points to, and validates with kubeconform.
+# Usage: hack/validate.sh [stack.yaml]
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-STACK=${1:-$ROOT/stack.example.yaml}; shift || true
-PACKS=("$@"); [ ${#PACKS[@]} -eq 0 ] && PACKS=(starter)
+STACK=${1:-$ROOT/stack.example.yaml}
 OUT=$(mktemp -d); trap 'rm -rf "$OUT"' EXIT
-KC=(kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.33.0
-  -schema-location default
+KC=(kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.33.0 -schema-location default
   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json')
-for pack in "${PACKS[@]}"; do
-  echo "== pack $pack"
-  helm template platform "$ROOT/charts/platform" -f "$STACK" --set pack="$pack" --set bootstrap=true > "$OUT/platform.yaml"
-  "${KC[@]}" "$OUT/platform.yaml"
-  yq -r 'select(.kind == "Application" and .metadata.name != "platform") | [.metadata.name, .spec.source.repoURL, (.spec.source.chart // "-"), .spec.source.targetRevision, (.spec.source.path // "-"), .spec.destination.namespace] | join(" ")' "$OUT/platform.yaml" > "$OUT/apps.txt"
-  while read -r n _; do
-    [ -n "$n" ] || continue
-    yq -o json "select(.kind == \"Application\" and .metadata.name == \"$n\") | .spec.source.helm.valuesObject // {}" "$OUT/platform.yaml" > "$OUT/$n.values.json"
-  done < "$OUT/apps.txt"
-  while read -r name repo chart ver path ns; do
-    [ -n "$name" ] || continue
-    if [ "$path" != "-" ]; then src=("$ROOT/$path")
-    elif [[ "$repo" == http* ]]; then src=("$chart" --repo "$repo" --version "$ver")
-    else src=("oci://$repo/$chart" --version "$ver"); fi
-    if helm template "$name" "${src[@]}" -n "$ns" -f "$OUT/$name.values.json" --include-crds > "$OUT/$name.yaml" 2> "$OUT/$name.err"; then
-      printf '%-18s ' "$name"; "${KC[@]}" "$OUT/$name.yaml" | tail -1
-    else echo "ECHEC $name"; cat "$OUT/$name.err"; exit 1; fi
-  done < "$OUT/apps.txt"
-done
+helm template root "$ROOT/argocd" -f "$STACK" > "$OUT/root.yaml"
+printf '%-18s ' root; "${KC[@]}" "$OUT/root.yaml" | tail -1
+yq -r 'select(.kind == "Application") | [.metadata.name, .spec.source.path, .spec.destination.namespace] | join(" ")' "$OUT/root.yaml" > "$OUT/apps.txt"
+for d in "$ROOT"/helm/apps/*/; do n=$(basename "$d"); echo "$n helm/apps/$n $n" >> "$OUT/apps.txt"; done
+global=$(yq -o json 'select(.kind == "ApplicationSet") | .spec.template.spec.source.helm.valuesObject' "$OUT/root.yaml")
+while read -r name path ns; do
+  [ -n "$name" ] || continue
+  if [[ $path == helm/apps/* ]]; then echo "$global" > "$OUT/v.json"
+  else yq -o json "select(.kind == \"Application\" and .metadata.name == \"$name\") | .spec.source.helm.valuesObject" "$OUT/root.yaml" > "$OUT/v.json"; fi
+  helm dependency build "$ROOT/$path" >/dev/null 2>&1 || helm dependency update "$ROOT/$path" >/dev/null
+  helm template "$name" "$ROOT/$path" -n "$ns" -f "$OUT/v.json" --include-crds > "$OUT/$name.yaml"
+  printf '%-18s ' "$name"; "${KC[@]}" "$OUT/$name.yaml" | tail -1
+done < "$OUT/apps.txt"

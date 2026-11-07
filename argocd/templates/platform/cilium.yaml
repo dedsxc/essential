@@ -1,0 +1,8 @@
+{{- if .Values.optional.cilium }}
+{{ include "kstack.app" (dict "ctx" $ "name" "cilium" "ns" "kube-system" "wave" -1 "values" (dict
+  "cilium" (dict
+    "k8sServiceHost" (required "cilium.k8sServiceHost is required (API server IP)" .Values.cilium.k8sServiceHost)
+    "k8sServicePort" .Values.cilium.k8sServicePort
+    "ipam" (dict "mode" "cluster-pool" "operator" (dict "clusterPoolIPv4PodCIDRList" (list .Values.cilium.podCIDR))))
+  "ciliumLB" .Values.ingress.ciliumLB)) }}
+{{- end }}

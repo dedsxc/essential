@@ -1,0 +1,9 @@
+apiVersion: v2
+name: openebs
+description: kien/stack openebs (wraps the upstream chart)
+type: application
+version: 0.1.0
+dependencies:
+  - name: openebs
+    repository: https://openebs.github.io/openebs
+    version: 4.6.2

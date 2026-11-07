@@ -1,0 +1,9 @@
+apiVersion: v2
+name: external-secrets
+description: kien/stack external-secrets (wraps the upstream chart)
+type: application
+version: 0.1.0
+dependencies:
+  - name: external-secrets
+    repository: https://charts.external-secrets.io
+    version: 2.14.0

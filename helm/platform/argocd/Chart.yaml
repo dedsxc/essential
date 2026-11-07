@@ -1,0 +1,9 @@
+apiVersion: v2
+name: argocd
+description: kien/stack argocd (wraps the upstream chart)
+type: application
+version: 0.1.0
+dependencies:
+  - name: argo-cd
+    repository: https://argoproj.github.io/argo-helm
+    version: 10.11.6

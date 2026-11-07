@@ -1,0 +1,5 @@
+cert-manager:
+  crds: {enabled: true, keep: true}
+  prometheus: {enabled: false}
+# Set by ArgoCD from stack.yaml
+tls: {issuer: selfsigned, email: "", staging: false, dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}}

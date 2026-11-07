@@ -1,3 +1,5 @@
 stack.yaml
 *.tgz
 .DS_Store
+helm/**/charts/
+helm/**/Chart.lock

@@ -1,0 +1,4 @@
+{{- if eq .Values.storage.provider "openebs-hostpath" }}
+{{ include "kstack.app" (dict "ctx" $ "name" "openebs" "ns" "openebs" "values" (dict
+  "openebs" (dict "localpv-provisioner" (dict "hostpathClass" (dict "isDefaultClass" .Values.storage.makeDefault))))) }}
+{{- end }}

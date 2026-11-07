@@ -1,0 +1,11 @@
+# Values of the upstream chart go under "traefik:". global.* comes from ArgoCD (domain, issuer...).
+traefik:
+  ingressClass: {enabled: true, isDefaultClass: true, name: traefik}
+  ports:
+    web:
+      allowACMEByPass: true   # let HTTP01 challenges through despite the https redirect
+      http:
+        redirections:
+          entryPoint: {to: websecure, scheme: https, permanent: true}
+  service:
+    spec: {type: LoadBalancer}

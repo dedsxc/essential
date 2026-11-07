@@ -127,10 +127,20 @@ git_ls_remote() {
 
 # ---------------------------------------------------------------- install
 VALUES=""
-render() { helm template platform "$ROOT/charts/platform" -f "$VALUES" "$@"; }
+# argocd/ is a Helm chart: rendered with your stack.yaml it gives one Application per platform brick.
+render() { helm template root "$ROOT/argocd" -f "$VALUES" "$@"; }
+app_values() { render | yq "select(.kind == \"Application\" and .metadata.name == \"$1\") | .spec.source.helm.valuesObject"; }
+# Install helm/platform/<name> once with Helm (same release name ArgoCD uses, so ArgoCD takes it over).
+helm_bootstrap() {
+  local name=$1 ns=$2 vals; vals=$(mktemp)
+  app_values "$name" > "$vals"
+  helm dependency update "$ROOT/helm/platform/$name" >/dev/null
+  helm upgrade --install "$name" "$ROOT/helm/platform/$name" -n "$ns" --create-namespace -f "$vals" --wait --timeout 10m >/dev/null
+  rm -f "$vals"
+}
 
 enabled_components() {
-  render --show-only templates/applications.yaml | yq -r 'select(.kind == "Application") | .metadata.name' | grep -vx -- '---'
+  render | yq -r 'select(.kind == "Application") | .metadata.name' | grep -vx -- '---'
 }
 
 ensure_ns() { kubectl create namespace "$1" --dry-run=client -o yaml | kubectl apply -f - >/dev/null; }
@@ -168,7 +178,7 @@ bootstrap_secrets() {
   if [ "$provider" = infisical ]; then
     ensure_secret external-secrets "$(cfg .secrets.infisical.credentialsSecret)" \
       "clientId=${INFISICAL_CLIENT_ID:?}" "clientSecret=${INFISICAL_CLIENT_SECRET:?}"
-    ok "app secrets will come from Infisical (ExternalSecrets, see charts/platform-config/values.yaml)"
+    ok "ClusterSecretStore 'infisical' will be created: use ExternalSecrets in your apps"
     return
   fi
   # provider none: generation locale (valeurs aleatoires), jamais commitees
@@ -211,7 +221,7 @@ install() {
 
   local comps; comps=$(enabled_components)
   log "Pack $PACK -> components: $(tr '\n' ' ' <<<"$comps")"
-  if [ "$DRY_RUN" -eq 1 ]; then render --set bootstrap=true; return; fi
+  if [ "$DRY_RUN" -eq 1 ]; then render; return; fi
 
   doctor || die "doctor failed: fix the prerequisites above"
 
@@ -219,26 +229,14 @@ install() {
 
   if grep -qx cilium <<<"$comps"; then
     log "Installing Cilium (CNI, before everything else; then managed by ArgoCD)"
-    local cvals cver; cvals=$(mktemp)
-    render --show-only templates/applications.yaml | yq 'select(.metadata.name == "cilium") | .spec.source.helm.valuesObject' > "$cvals"
-    cver=$(render --show-only templates/applications.yaml | yq -r 'select(.metadata.name == "cilium") | .spec.source.targetRevision' | grep -vx -- '---')
-    helm upgrade --install cilium cilium --repo https://helm.cilium.io/ --version "$cver" -n kube-system \
-      -f "$cvals" --wait --timeout 10m >/dev/null
-    rm -f "$cvals"
+    helm_bootstrap cilium kube-system
     kubectl wait --for=condition=Ready nodes --all --timeout=5m >/dev/null
-    ok "Cilium $cver ready, nodes Ready"
+    ok "Cilium ready, nodes Ready"
   fi
 
   log "Installing ArgoCD (Helm, then self-managed by ArgoCD)"
-  local avals; avals=$(mktemp)
-  render --show-only templates/applications.yaml | yq 'select(.metadata.name == "argocd") | .spec.source.helm.valuesObject' > "$avals"
-  local aver arepo
-  aver=$(render --show-only templates/applications.yaml | yq -r 'select(.metadata.name == "argocd") | .spec.source.targetRevision' | grep -vx -- '---')
-  arepo=$(render --show-only templates/applications.yaml | yq -r 'select(.metadata.name == "argocd") | .spec.source.repoURL' | grep -vx -- '---')
-  helm upgrade --install argocd argo-cd --repo "$arepo" --version "$aver" -n argocd --create-namespace \
-    -f "$avals" --wait --timeout 10m >/dev/null
-  rm -f "$avals"
-  ok "ArgoCD $aver ready"
+  helm_bootstrap argocd argocd
+  ok "ArgoCD ready"
   local pw; pw=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
   log "ArgoCD login: admin / ${pw:-<see argocd-initial-admin-secret>}"
   log "  UI now (no ingress needed): kubectl -n argocd port-forward svc/argocd-server 8080:443  ->  https://localhost:8080"
@@ -260,8 +258,26 @@ YAML
     ok "GitOps repo credential registered in ArgoCD"
   fi
 
-  log "Root Application 'platform' (app-of-apps)"
-  render --set bootstrap=true | yq 'select(.kind == "Application" and .metadata.name == "platform")' | kubectl apply -f - >/dev/null
+  log "Root Application 'root' (app-of-apps: argocd/ -> helm/platform/*, helm/apps/*)"
+  kubectl apply -f - >/dev/null <<YAML
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: argocd}
+  source:
+    repoURL: $(cfg .gitops.repoURL)
+    targetRevision: $(cfg .gitops.targetRevision)
+    path: argocd
+    helm:
+      valuesObject:
+$(yq '.' "$VALUES" | sed 's/^/        /')
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+YAML
   ok "applied: ArgoCD now syncs from $(cfg .gitops.repoURL)"
 
   wait_apps "$comps"
@@ -273,7 +289,7 @@ wait_apps() {
   log "Waiting for Synced/Healthy (timeout $ARGOCD_TIMEOUT)"
   while :; do
     pending=""
-    for a in platform $comps; do
+    for a in root $comps; do
       local st
       st=$(kubectl -n argocd get application "$a" -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
       [ "$st" = Synced/Healthy ] || pending="$pending $a(${st:-absent})"
@@ -293,12 +309,12 @@ wait_apps() {
 }
 
 summary() {
-  local d; d=$(cfg .domain)
+  local d; d=$(yq -r .domain "$VALUES")
   log "Done. Access:"
   echo "  ArgoCD : https://argocd.$d  (admin / kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
-  grep -qx monitoring <<<"$(enabled_components)" && echo "  Grafana: https://grafana.$d (admin / kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d)"
   grep -qx infisical <<<"$(enabled_components)" && echo "  Infisical: https://infisical.$d (create the admin account on first visit)"
-  [ "$(cfg .tls.issuer)" = selfsigned ] && echo "  (self-signed certificates: CA in cert-manager/selfsigned-ca)"
+  echo "  Your apps: add helm/apps/<name>/ (see helm/apps/hello) in $(cfg .gitops.repoURL), push."
+  [ "$(yq -r .tls.issuer "$VALUES")" = selfsigned ] && echo "  (self-signed certificates: CA in cert-manager/selfsigned-ca)"
   return 0
 }
 

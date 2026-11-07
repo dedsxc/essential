@@ -1,6 +1,0 @@
-apiVersion: v2
-name: platform
-description: App-of-apps ArgoCD de la plateforme kube-ia (rendu depuis stack.yaml)
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

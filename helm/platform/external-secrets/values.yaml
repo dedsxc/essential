@@ -1,0 +1,4 @@
+external-secrets:
+  installCRDs: true
+# Set by ArgoCD from stack.yaml. provider: infisical creates a ClusterSecretStore.
+secrets: {provider: none, infisical: {}}

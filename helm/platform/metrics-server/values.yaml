@@ -1,0 +1,3 @@
+metrics-server:
+  args:
+    - --kubelet-insecure-tls   # homelab/minikube kubelets use self-signed certs

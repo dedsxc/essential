@@ -1,0 +1,4 @@
+external-dns:
+  sources: [ingress]
+  policy: upsert-only
+  txtOwnerId: kien-stack

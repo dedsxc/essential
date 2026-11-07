@@ -1,0 +1,9 @@
+apiVersion: v2
+name: traefik
+description: kien/stack traefik (wraps the upstream chart)
+type: application
+version: 0.1.0
+dependencies:
+  - name: traefik
+    repository: https://traefik.github.io/charts
+    version: 42.2.0

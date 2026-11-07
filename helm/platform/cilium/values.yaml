@@ -1,0 +1,11 @@
+# Cilium: eBPF CNI, replaces kube-proxy, L2 load balancer IPs (no MetalLB).
+cilium:
+  kubeProxyReplacement: true
+  operator: {replicas: 1}
+  bpf: {masquerade: true}
+  l2announcements: {enabled: true}
+  externalIPs: {enabled: true}
+  k8sClientRateLimit: {qps: 20, burst: 40}
+  hubble: {enabled: true, relay: {enabled: false}, ui: {enabled: false}}
+# Set by ArgoCD from stack.yaml (ingress.ciliumLB)
+ciliumLB: {enabled: false, start: "", stop: ""}

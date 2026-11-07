@@ -6,7 +6,7 @@ gitops:
   # Git repo ArgoCD watches (your fork of this repo). Private repo: install.sh creates the credential.
   repoURL: https://github.com/myorg/my-platform.git
   targetRevision: main
-  path: charts/platform
+
 tls:
   issuer: selfsigned   # selfsigned | letsencrypt-http01 | letsencrypt-dns01
   email: admin@example.com

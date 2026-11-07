@@ -1,0 +1,9 @@
+apiVersion: v2
+name: infisical
+description: kien/stack infisical (wraps the upstream chart)
+type: application
+version: 0.1.0
+dependencies:
+  - name: infisical-standalone
+    repository: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+    version: 1.12.0

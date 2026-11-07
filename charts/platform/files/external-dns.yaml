@@ -1,8 +1,0 @@
-provider: {name: {{ .Values.dns.provider }}}
-domainFilters: [{{ .Values.domain | quote }}]
-sources: [ingress]
-policy: upsert-only
-txtOwnerId: kube-ia-platform
-env:
-  - name: CF_API_TOKEN
-    valueFrom: {secretKeyRef: {name: {{ .Values.dns.secretName }}, key: api-token, optional: true}}
