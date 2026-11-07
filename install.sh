@@ -157,6 +157,11 @@ helm_bootstrap() {
     -f "$ROOT/cluster.yaml" -f "$g" --wait --timeout 10m >/dev/null
   rm -f "$g"
 }
+# k3s (and some distros/addons) already run a metrics-server in kube-system with an immutable
+# k8s-app selector: ours would fail to sync, so we keep theirs and skip the brick.
+foreign_metrics_server() {
+  [ -n "$(kubectl -n kube-system get deploy metrics-server -o jsonpath='{.spec.selector.matchLabels.k8s-app}' 2>/dev/null)" ]
+}
 enabled_components() {
   local d n
   for d in "$ROOT"/helm/platform/*/ "$ROOT"/helm/apps/*/; do
@@ -164,6 +169,7 @@ enabled_components() {
     case $n in
       cilium) [ "$(yq -r '.optional.cilium // false' "$VALUES")" = true ] || continue ;;
       external-dns) [ "$(yq -r '.dns.provider // "none"' "$VALUES")" != none ] || continue ;;
+      metrics-server) ! foreign_metrics_server || continue ;;
     esac
     echo "$n"
   done
@@ -173,7 +179,8 @@ enabled_components() {
 app_of_apps() {
   local g; g=$(mktemp); gen_values > "$g"
   R=$(cfg .gitops.repoURL) B=$(cfg .gitops.targetRevision) G="$g" \
-  DNS=$(yq -r '.dns.provider // "none"' "$VALUES") CIL=$(yq -r '.optional.cilium // false' "$VALUES") yq -n '
+  DNS=$(yq -r '.dns.provider // "none"' "$VALUES") CIL=$(yq -r '.optional.cilium // false' "$VALUES") \
+  MS=$(foreign_metrics_server && echo true || echo false) yq -n '
     .apiVersion = "argoproj.io/v1alpha1" | .kind = "Application" |
     .metadata = {"name": "app-of-apps", "namespace": "argocd"} |
     .spec.project = "default" |
@@ -185,8 +192,10 @@ app_of_apps() {
       {"op": "replace", "path": "/spec/template/spec/source/repoURL", "value": strenv(R)},
       {"op": "replace", "path": "/spec/template/spec/source/targetRevision", "value": strenv(B)},
       {"op": "add", "path": "/spec/template/spec/source/helm/valuesObject", "value": load(strenv(G))}]) as $ops |
-    ([] + (select(strenv(DNS) != "none") | [{"op": "remove", "path": "/spec/generators/0/git/directories/2"}]) // []
-        + (select(strenv(CIL) == "true") | [{"op": "remove", "path": "/spec/generators/0/git/directories/1"}]) // []) as $ex |
+    # Each term parenthesised: "//" binds looser than "+". Removals highest index first.
+    ([] + ((select(strenv(DNS) != "none") | [{"op": "remove", "path": "/spec/generators/0/git/directories/2"}]) // [])
+        + ((select(strenv(CIL) == "true") | [{"op": "remove", "path": "/spec/generators/0/git/directories/1"}]) // [])
+        + ((select(strenv(MS) == "true") | [{"op": "add", "path": "/spec/generators/0/git/directories/-", "value": {"path": "helm/platform/metrics-server", "exclude": true}}]) // [])) as $ex |
     .spec.source.kustomize.patches = [{"target": {"kind": "ApplicationSet"}, "patch": ($ops | to_json)}] |
     (select(($ex | length) > 0) | .spec.source.kustomize.patches += [{"target": {"kind": "ApplicationSet", "name": "platform"}, "patch": ($ex | to_json)}]) // .'
   rm -f "$g"

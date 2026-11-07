@@ -3,6 +3,9 @@ kind: AppProject
 metadata:
   name: apps
   namespace: argocd
+  annotations:
+    # Created before the ApplicationSet that references it (avoids a ~3 min generation retry)
+    argocd.argoproj.io/sync-wave: "-1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
