@@ -18,7 +18,7 @@ CMD=install
 DRY_RUN=0
 ARGOCD_TIMEOUT=${ARGOCD_TIMEOUT:-600s}
 
-log()  { printf '\033[1;34m[kien/stack]\033[0m %s\n' "$*"; }
+log()  { if [ "$DRY_RUN" -eq 1 ]; then printf "[kien/stack] %s\n" "$*" >&2; else printf '\033[1;34m[kien/stack]\033[0m %s\n' "$*"; fi; }
 ok()   { printf '  \033[32mOK\033[0m   %s\n' "$*"; }
 warn() { printf '  \033[33mWARN\033[0m %s\n' "$*"; }
 ko()   { printf '  \033[31mKO\033[0m   %s\n' "$*"; }
@@ -279,7 +279,8 @@ install() {
 
   local comps; comps=$(enabled_components)
   log "Pack $PACK -> components: $(tr '\n' ' ' <<<"$comps")"
-  if [ "$DRY_RUN" -eq 1 ]; then gen_values; app_of_apps; return; fi
+  # Dry-run: stdout is valid YAML (kubectl apply -f - ready); values shown as comments (already in the patch)
+  if [ "$DRY_RUN" -eq 1 ]; then echo "# Helm values injected in every chart:"; gen_values | sed 's/^/#   /'; app_of_apps; return; fi
 
   doctor || die "doctor failed: fix the prerequisites above"
 
