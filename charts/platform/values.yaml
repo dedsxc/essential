@@ -1,4 +1,4 @@
-# Valeurs par defaut. stack.yaml (cf. stack.example.yaml) surcharge ces cles.
+# Defaults. stack.yaml (see stack.example.yaml) overrides these keys.
 # pack: starter (cette edition gratuite). ia / full: packs payants, https://shop.kien.cc
 pack: starter
 # true uniquement pour le rendu bootstrap fait par install.sh (Application racine)
