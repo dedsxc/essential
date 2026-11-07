@@ -1,1 +1,0 @@
-{{ include "kstack.app" (dict "ctx" $ "name" "metrics-server" "ns" "kube-system") }}

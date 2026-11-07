@@ -1,5 +1,5 @@
 # stack.yaml: single source of truth for your install (copy to stack.yaml and edit).
-pack: starter         # free edition (Private AI / All-In-One are paid: https://shop.kien.cc)
+pack: essential         # free edition (Private AI / All-In-One are paid: https://shop.kien.cc)
 domain: example.com   # subdomains: argocd., infisical.
                       # No domain? Leave empty: <ip>.sslip.io (IP = ingress.ciliumLB.start or ingress.nodeIP), self-signed certs
 gitops:

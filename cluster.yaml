@@ -1,0 +1,23 @@
+# cluster.yaml: defaults read by every chart (helm/platform/* and helm/apps/*).
+# install.sh overrides global.* and the per-brick keys below from your stack.yaml (domain, TLS...):
+# change those in stack.yaml and re-run install.sh. Anything else can be set here: edit + push.
+global:
+  domain: example.com            # apps get <name>.example.com
+  issuer: selfsigned-ca          # ClusterIssuer for Ingresses: selfsigned-ca | letsencrypt
+  ingressClass: traefik
+  storageClass: openebs-hostpath # empty = cluster default
+  tls:
+    issuer: selfsigned           # selfsigned | letsencrypt-http01 | letsencrypt-dns01
+    email: admin@example.com
+    staging: false
+    dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}
+  secrets:
+    provider: none               # infisical: ClusterSecretStore for External Secrets
+    infisical: {hostAPI: https://app.infisical.com, projectSlug: my-project, environmentSlug: prod, credentialsSecret: infisical-universal-auth}
+
+# Per-brick overrides (key = upstream chart name). Examples:
+traefik:
+  service:
+    spec: {type: LoadBalancer}   # NodePort if your cluster has no load balancer
+# cilium: {k8sServiceHost: 192.168.1.10}
+# external-dns: {provider: {name: cloudflare}, domainFilters: [example.com]}

@@ -1,0 +1,36 @@
+# One Application per folder in helm/apps/ (your apps): add helm/apps/<name>/, push, done.
+# install.sh sets repoURL/revision and global values (domain, TLS...) from your stack.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/dedsxc/kien-stack-essential.git
+        revision: main
+        directories:
+          - path: "helm/apps/*"
+  template:
+    metadata:
+      name: "{{ .path.basename }}"
+      finalizers: [resources-finalizer.argocd.argoproj.io]
+    spec:
+      project: apps
+      source:
+        repoURL: https://github.com/dedsxc/kien-stack-essential.git
+        targetRevision: main
+        path: "{{ .path.path }}"
+        helm:
+          releaseName: "{{ .path.basename }}"
+          valueFiles: [values.yaml, ../../../cluster.yaml]   # your settings, see /cluster.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .path.basename }}"
+      syncPolicy:
+        automated: {prune: true, selfHeal: true}
+        retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 5m}}
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]

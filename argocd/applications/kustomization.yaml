@@ -1,0 +1,6 @@
+# Every folder here = one AppProject + one ApplicationSet. Add your own folder and list it below.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - platform
+  - apps

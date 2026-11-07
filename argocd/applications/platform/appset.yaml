@@ -1,0 +1,47 @@
+# One Application per folder in helm/platform/ (the base platform). Exceptions in templatePatch.
+# install.sh sets repoURL/revision and global values (domain, TLS...) from your stack.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/dedsxc/kien-stack-essential.git
+        revision: main
+        directories:
+          - path: "helm/platform/*"
+          # optional bricks: remove the line to enable
+          - {path: helm/platform/cilium, exclude: true}
+          - {path: helm/platform/external-dns, exclude: true}
+  templatePatch: |
+    {{- if eq .path.basename "cloudnative-pg" }}
+    spec:
+      destination: {namespace: cnpg-system}
+    {{- else if has .path.basename (list "metrics-server" "cilium") }}
+    spec:
+      destination: {namespace: kube-system}
+    {{- end }}
+  template:
+    metadata:
+      name: "{{ .path.basename }}"
+      finalizers: [resources-finalizer.argocd.argoproj.io]
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/dedsxc/kien-stack-essential.git
+        targetRevision: main
+        path: "{{ .path.path }}"
+        helm:
+          releaseName: "{{ .path.basename }}"
+          valueFiles: [values.yaml, ../../../cluster.yaml]   # your settings, see /cluster.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .path.basename }}"
+      syncPolicy:
+        automated: {prune: true, selfHeal: true}
+        retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 5m}}
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]

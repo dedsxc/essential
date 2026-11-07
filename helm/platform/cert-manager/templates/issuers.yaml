@@ -28,7 +28,7 @@ metadata:
   name: selfsigned-ca
 spec:
   ca: {secretName: selfsigned-ca}
-{{- if hasPrefix "letsencrypt" .Values.tls.issuer }}
+{{- if hasPrefix "letsencrypt" .Values.global.tls.issuer }}
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -37,17 +37,17 @@ metadata:
   name: letsencrypt
 spec:
   acme:
-    email: {{ .Values.tls.email }}
-    server: {{ if .Values.tls.staging }}https://acme-staging-v02.api.letsencrypt.org/directory{{ else }}https://acme-v02.api.letsencrypt.org/directory{{ end }}
+    email: {{ .Values.global.tls.email }}
+    server: {{ if .Values.global.tls.staging }}https://acme-staging-v02.api.letsencrypt.org/directory{{ else }}https://acme-v02.api.letsencrypt.org/directory{{ end }}
     privateKeySecretRef: {name: letsencrypt-account}
     solvers:
-      {{- if eq .Values.tls.issuer "letsencrypt-dns01" }}
+      {{- if eq .Values.global.tls.issuer "letsencrypt-dns01" }}
       - dns01:
-          {{- if eq .Values.tls.dns01.provider "cloudflare" }}
+          {{- if eq .Values.global.tls.dns01.provider "cloudflare" }}
           cloudflare:
-            apiTokenSecretRef: {name: {{ .Values.tls.dns01.secretName }}, key: {{ .Values.tls.dns01.secretKey }}}
+            apiTokenSecretRef: {name: {{ .Values.global.tls.dns01.secretName }}, key: {{ .Values.global.tls.dns01.secretKey }}}
           {{- else }}
-          {{- fail (printf "dns01 provider non supporte: %s (utiliser cloudflare ou HTTP01)" .Values.tls.dns01.provider) }}
+          {{- fail (printf "dns01 provider non supporte: %s (utiliser cloudflare ou HTTP01)" .Values.global.tls.dns01.provider) }}
           {{- end }}
       {{- else }}
       - http01:

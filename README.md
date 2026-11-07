@@ -1,4 +1,4 @@
-# kien/stack Starter
+# kien/stack Essential
 
 Free, open source GitOps platform for Kubernetes, installed in one command.
 ArgoCD deploys and manages everything from your Git repo.
@@ -26,7 +26,7 @@ curl -fsSL https://shop.kien.cc/try.sh | bash
 curl -fsSL https://shop.kien.cc/try.sh | bash -s uninstall
 ```
 
-Real install: [fork this repo](https://github.com/dedsxc/kien-stack-starter/fork), then
+Real install: [fork this repo](https://github.com/dedsxc/kien-stack-essential/fork), then
 
 ```bash
 curl -fsSL https://shop.kien.cc/install.sh | bash    # asks for your fork, domain, email
@@ -82,7 +82,7 @@ Validate offline: `bash hack/validate.sh stack.yaml` (helm template + kubeconfor
 ## Paid packs
 
 **Private AI** (Onyx, Ollama, LiteLLM, Coder) and **All-In-One** (monitoring, SSO, S3, Argo Rollouts,
-Renovate, Radar, Terraform for AWS EKS) build on this Starter: https://shop.kien.cc
+Renovate, Radar, Terraform for AWS EKS) build on this Essential: https://shop.kien.cc
 
 ## License
 

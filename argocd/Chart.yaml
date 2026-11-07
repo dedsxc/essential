@@ -1,7 +1,0 @@
-apiVersion: v2
-name: argocd-root
-description: >
-  App-of-apps. Every file in templates/platform/ is one ArgoCD Application pointing to a Helm
-  chart in helm/platform/. templates/applications.yaml creates one Application per helm/apps/* folder.
-type: application
-version: 0.2.0

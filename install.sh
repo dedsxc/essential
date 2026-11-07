@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# kien/stack Starter installer (free, Apache-2.0).
+# kien/stack Essential installer (free, Apache-2.0).
 #   ./install.sh doctor  [--config stack.yaml]
-#   ./install.sh install --pack starter [--config stack.yaml] [--dry-run]
-#   ./install.sh --pack starter --config stack.yaml       (implicit install)
+#   ./install.sh install --pack essential [--config stack.yaml] [--dry-run]
+#   ./install.sh --pack essential --config stack.yaml       (implicit install)
 # Target: the cluster of the current kubectl context.
 # Optional environment variables:
 #   GIT_USERNAME / GIT_TOKEN          private GitOps repo (HTTPS)
@@ -78,7 +78,7 @@ doctor() {
     ok "allocatable capacity: ${cpu} CPU / ${mem} Gi"
     local p=${PACK:-$(cfg .pack)}
     case "$p" in
-      starter) [ "$mem" -ge 3 ] || warn "starter: >= 2 CPU / 6 GB recommended" ;;
+      essential) [ "$mem" -ge 3 ] || warn "essential: >= 2 CPU / 6 GB recommended" ;;
       ia|full) [ "$mem" -ge 14 ] || warn "pack $p: >= 8 CPU / 16 GB recommended" ;;
     esac
   fi
@@ -127,20 +127,69 @@ git_ls_remote() {
 
 # ---------------------------------------------------------------- install
 VALUES=""
-# argocd/ is a Helm chart: rendered with your stack.yaml it gives one Application per platform brick.
-render() { helm template root "$ROOT/argocd" -f "$VALUES" "$@"; }
-app_values() { render | yq "select(.kind == \"Application\" and .metadata.name == \"$1\") | .spec.source.helm.valuesObject"; }
-# Install helm/platform/<name> once with Helm (same release name ArgoCD uses, so ArgoCD takes it over).
-helm_bootstrap() {
-  local name=$1 ns=$2 vals; vals=$(mktemp)
-  app_values "$name" > "$vals"
-  helm dependency update "$ROOT/helm/platform/$name" >/dev/null
-  helm upgrade --install "$name" "$ROOT/helm/platform/$name" -n "$ns" --create-namespace -f "$vals" --wait --timeout 10m >/dev/null
-  rm -f "$vals"
+# Values every chart gets on top of its values.yaml and /cluster.yaml (from your stack.yaml).
+gen_values() {
+  local is=selfsigned-ca; case $(yq -r .tls.issuer "$VALUES") in letsencrypt*) is=letsencrypt ;; esac
+  ISSUER=$is V="$VALUES" yq -n '
+    .global.domain = load(strenv(V)).domain |
+    .global.issuer = strenv(ISSUER) |
+    .global.ingressClass = (load(strenv(V)).ingress.className // "traefik") |
+    .global.storageClass = (load(strenv(V)).storageClass // "") |
+    .global.tls = load(strenv(V)).tls | .global.secrets = load(strenv(V)).secrets |
+    .traefik.service.spec.type = (load(strenv(V)).ingress.serviceType // "LoadBalancer") |
+    .ciliumLB = (load(strenv(V)).ingress.ciliumLB // {"enabled": false}) |
+    .openebs."localpv-provisioner".hostpathClass.isDefaultClass = (load(strenv(V)).storage.makeDefault // false)' \
+    | V="$VALUES" yq '
+      (select(load(strenv(V)).ingress.serviceType == "NodePort") | .traefik.providers.kubernetesIngress =
+        {"publishedService": {"enabled": false}, "ingressEndpoint": {"ip": (load(strenv(V)).ingress.nodeIP // "127.0.0.1")}}) // . |
+      (select(load(strenv(V)).optional.cilium == true) | .cilium = {"k8sServiceHost": load(strenv(V)).cilium.k8sServiceHost,
+        "k8sServicePort": load(strenv(V)).cilium.k8sServicePort, "ipam": {"mode": "cluster-pool",
+        "operator": {"clusterPoolIPv4PodCIDRList": [load(strenv(V)).cilium.podCIDR]}}}) // . |
+      (select(load(strenv(V)).dns.provider != "none") | ."external-dns" = {"provider": {"name": load(strenv(V)).dns.provider},
+        "domainFilters": [load(strenv(V)).domain], "env": [{"name": "CF_API_TOKEN", "valueFrom": {"secretKeyRef":
+        {"name": load(strenv(V)).dns.secretName, "key": "api-token", "optional": true}}}]}) // .'
 }
-
+# Install helm/platform/<name> once with Helm (same release name as ArgoCD, which then takes it over).
+helm_bootstrap() {
+  local name=$1 ns=$2 g; g=$(mktemp); gen_values > "$g"
+  helm dependency update "$ROOT/helm/platform/$name" >/dev/null
+  helm upgrade --install "$name" "$ROOT/helm/platform/$name" -n "$ns" --create-namespace \
+    -f "$ROOT/cluster.yaml" -f "$g" --wait --timeout 10m >/dev/null
+  rm -f "$g"
+}
 enabled_components() {
-  render | yq -r 'select(.kind == "Application") | .metadata.name' | grep -vx -- '---'
+  local d n
+  for d in "$ROOT"/helm/platform/*/ "$ROOT"/helm/apps/*/; do
+    n=$(basename "$d")
+    case $n in
+      cilium) [ "$(yq -r '.optional.cilium // false' "$VALUES")" = true ] || continue ;;
+      external-dns) [ "$(yq -r '.dns.provider // "none"' "$VALUES")" != none ] || continue ;;
+    esac
+    echo "$n"
+  done
+}
+# app-of-apps with kustomize patches: your repo/branch in the ApplicationSets, your settings as Helm values,
+# optional bricks (cilium, external-dns) un-excluded. argocd/applications/ itself stays plain YAML.
+app_of_apps() {
+  local g; g=$(mktemp); gen_values > "$g"
+  R=$(cfg .gitops.repoURL) B=$(cfg .gitops.targetRevision) G="$g" \
+  DNS=$(yq -r '.dns.provider // "none"' "$VALUES") CIL=$(yq -r '.optional.cilium // false' "$VALUES") yq -n '
+    .apiVersion = "argoproj.io/v1alpha1" | .kind = "Application" |
+    .metadata = {"name": "app-of-apps", "namespace": "argocd"} |
+    .spec.project = "default" |
+    .spec.destination = {"server": "https://kubernetes.default.svc", "namespace": "argocd"} |
+    .spec.source = {"repoURL": strenv(R), "targetRevision": strenv(B), "path": "argocd/applications"} |
+    .spec.syncPolicy.automated = {"prune": true, "selfHeal": true} |
+    ([{"op": "replace", "path": "/spec/generators/0/git/repoURL", "value": strenv(R)},
+      {"op": "replace", "path": "/spec/generators/0/git/revision", "value": strenv(B)},
+      {"op": "replace", "path": "/spec/template/spec/source/repoURL", "value": strenv(R)},
+      {"op": "replace", "path": "/spec/template/spec/source/targetRevision", "value": strenv(B)},
+      {"op": "add", "path": "/spec/template/spec/source/helm/valuesObject", "value": load(strenv(G))}]) as $ops |
+    ([] + (select(strenv(DNS) != "none") | [{"op": "remove", "path": "/spec/generators/0/git/directories/2"}]) // []
+        + (select(strenv(CIL) == "true") | [{"op": "remove", "path": "/spec/generators/0/git/directories/1"}]) // []) as $ex |
+    .spec.source.kustomize.patches = [{"target": {"kind": "ApplicationSet"}, "patch": ($ops | to_json)}] |
+    (select(($ex | length) > 0) | .spec.source.kustomize.patches += [{"target": {"kind": "ApplicationSet", "name": "platform"}, "patch": ($ex | to_json)}]) // .'
+  rm -f "$g"
 }
 
 ensure_ns() { kubectl create namespace "$1" --dry-run=client -o yaml | kubectl apply -f - >/dev/null; }
@@ -210,7 +259,7 @@ bootstrap_secrets() {
 install() {
   [ -f "$CONFIG" ] || die "config not found: $CONFIG"
   PACK=${PACK:-$(cfg .pack)}
-  case "$PACK" in starter) ;; ia|full) die "pack $PACK is a paid edition (https://shop.kien.cc). This edition installs the starter." ;; *) die "--pack must be starter (got: '$PACK')" ;; esac
+  case "$PACK" in essential) ;; ia|full) die "pack $PACK is a paid edition (https://shop.kien.cc). This edition installs the essential." ;; *) die "--pack must be essential (got: '$PACK')" ;; esac
   VALUES=$(mktemp); trap 'rm -f "$VALUES"' EXIT
   yq ".pack = \"$PACK\"" "$CONFIG" > "$VALUES"
   local dom; dom=$(auto_domain)
@@ -221,7 +270,7 @@ install() {
 
   local comps; comps=$(enabled_components)
   log "Pack $PACK -> components: $(tr '\n' ' ' <<<"$comps")"
-  if [ "$DRY_RUN" -eq 1 ]; then render; return; fi
+  if [ "$DRY_RUN" -eq 1 ]; then gen_values; app_of_apps; return; fi
 
   doctor || die "doctor failed: fix the prerequisites above"
 
@@ -258,26 +307,8 @@ YAML
     ok "GitOps repo credential registered in ArgoCD"
   fi
 
-  log "Root Application 'root' (app-of-apps: argocd/ -> helm/platform/*, helm/apps/*)"
-  kubectl apply -f - >/dev/null <<YAML
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: root
-  namespace: argocd
-spec:
-  project: default
-  destination: {server: https://kubernetes.default.svc, namespace: argocd}
-  source:
-    repoURL: $(cfg .gitops.repoURL)
-    targetRevision: $(cfg .gitops.targetRevision)
-    path: argocd
-    helm:
-      valuesObject:
-$(yq '.' "$VALUES" | sed 's/^/        /')
-  syncPolicy:
-    automated: {prune: true, selfHeal: true}
-YAML
+  log "Root Application 'app-of-apps' (argocd/applications: platform + apps ApplicationSets)"
+  app_of_apps | kubectl apply -f - >/dev/null
   ok "applied: ArgoCD now syncs from $(cfg .gitops.repoURL)"
 
   wait_apps "$comps"
@@ -289,7 +320,7 @@ wait_apps() {
   log "Waiting for Synced/Healthy (timeout $ARGOCD_TIMEOUT)"
   while :; do
     pending=""
-    for a in root $comps; do
+    for a in app-of-apps $comps; do
       local st
       st=$(kubectl -n argocd get application "$a" -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
       [ "$st" = Synced/Healthy ] || pending="$pending $a(${st:-absent})"

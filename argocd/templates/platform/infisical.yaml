@@ -1,4 +1,0 @@
-{{ include "kstack.app" (dict "ctx" $ "name" "infisical" "ns" "infisical" "wave" 2 "values" (dict
-  "infisical-standalone" (dict "infisical" (dict "extraEnv" (list
-    (dict "name" "DB_CONNECTION_URI" "valueFrom" (dict "secretKeyRef" (dict "name" "infisical-pg-app" "key" "uri")))
-    (dict "name" "SITE_URL" "value" (printf "https://infisical.%s" .Values.domain))))))) }}

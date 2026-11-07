@@ -1,7 +1,0 @@
-{{- $np := eq .Values.ingress.serviceType "NodePort" }}
-{{ include "kstack.app" (dict "ctx" $ "name" "traefik" "ns" "traefik" "values" (dict
-  "traefik" (dict
-    "service" (dict "spec" (dict "type" .Values.ingress.serviceType))
-    "providers" (dict "kubernetesIngress" (dict
-      "publishedService" (dict "enabled" (not $np))
-      "ingressEndpoint" (ternary (dict "ip" (.Values.ingress.nodeIP | default "127.0.0.1")) dict $np)))))) }}

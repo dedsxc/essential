@@ -8,7 +8,7 @@
    - une **StorageClass par defaut** (PVC Postgres, Ollama, Onyx, Prometheus);
    - un **LoadBalancer** pour le Service Traefik: cloud, k3s ServiceLB, ou **Cilium** (homelab: `ingress.ciliumLB.enabled: true` + une plage d IP libre du LAN, annoncee en L2, sans MetalLB). A defaut un NodePort (`ingress.serviceType: NodePort` + `ingress.nodeIP`).
 2. **Ressources minimales (allouables)**:
-   - pack `starter`: 2 vCPU / 6 Go RAM (8 recommandes) / 40 Go disque;
+   - pack `essential`: 2 vCPU / 6 Go RAM (8 recommandes) / 40 Go disque;
    - pack `ia` / `full`, Onyx complet (defaut, `ai.onyx.small: false`, indexation OpenSearch) + Ollama CPU
      `qwen2.5:0.5b`: **6 vCPU / 12 Go minimum (tres juste), 16 Go recommandes** / 80 Go disque;
    - Onyx leger (`ai.onyx.small: true`, chat sans indexation): ~4 Go de moins;
@@ -48,7 +48,7 @@ Laisser `domain` vide : l'installeur utilise `<ip>.sslip.io` (DNS public gratuit
 `ingress.ciliumLB.start` ou `ingress.nodeIP`) et des certificats **self-signed** (CA dans `cert-manager/selfsigned-ca`).
 Ex. `https://argocd.192.168.1.240.sslip.io`. Le navigateur affiche un avertissement tant que la CA n'est pas importee.
 
-## Cilium (option du Starter)
+## Cilium (option du Essential)
 
 `optional.cilium: true` + `cilium.k8sServiceHost` (IP du serveur API) : Cilium est installe en premier (CNI eBPF,
 remplace kube-proxy, load balancer L2 via `ingress.ciliumLB`). Le cluster doit etre cree sans CNI ni kube-proxy,

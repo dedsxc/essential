@@ -1,7 +1,0 @@
-{{- if ne .Values.dns.provider "none" }}
-{{ include "kstack.app" (dict "ctx" $ "name" "external-dns" "ns" "external-dns" "wave" 1 "values" (dict
-  "external-dns" (dict
-    "provider" (dict "name" .Values.dns.provider)
-    "domainFilters" (list .Values.domain)
-    "env" (list (dict "name" "CF_API_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" .Values.dns.secretName "key" "api-token" "optional" true))))))) }}
-{{- end }}

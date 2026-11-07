@@ -7,5 +7,12 @@ cilium:
   externalIPs: {enabled: true}
   k8sClientRateLimit: {qps: 20, burst: 40}
   hubble: {enabled: true, relay: {enabled: false}, ui: {enabled: false}}
-# Set by ArgoCD from stack.yaml (ingress.ciliumLB)
-ciliumLB: {enabled: false, start: "", stop: ""}
+ciliumLB: {enabled: false, start: "", stop: ""}   # homelab L2 load balancer IPs
+# global.* comes from /cluster.yaml (passed to every chart by the ApplicationSets). Defaults:
+global:
+  domain: example.com
+  issuer: selfsigned-ca
+  ingressClass: traefik
+  storageClass: ""
+  tls: {issuer: selfsigned, email: "", staging: false, dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}}
+  secrets: {provider: none, infisical: {}}
