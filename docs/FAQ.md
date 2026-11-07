@@ -35,7 +35,7 @@ Non teste en cluster: pack `full` complet, installeur Terraform sur un vrai comp
 7. **Secrets**: par defaut generes aleatoirement par `install.sh` dans le cluster. En production, recommande:
    un projet **Infisical** (cloud ou auto-heberge) + une *Machine Identity* Universal Auth
    (`INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`); les cles attendues sont listees dans
-   `charts/platform-config/values.yaml` (`appSecrets`).
+   an `ExternalSecret` in your app chart (`helm/apps/<app>/templates/`).
 8. **Inference externe (optionnel)**: cle API Anthropic et/ou Gemini, ou identifiants AWS Bedrock (region activee).
 
 **Pas besoin de**: Vault, charts Bitnami, GPU (CPU par defaut), acces Internet entrant (sauf HTTP01).
