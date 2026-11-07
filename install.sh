@@ -105,6 +105,11 @@ doctor() {
   if [ "$(cfg .secrets.provider)" = infisical ]; then
     if [ -n "${INFISICAL_CLIENT_ID:-}" ] && [ -n "${INFISICAL_CLIENT_SECRET:-}" ]; then ok "Infisical credentials"; else ko "INFISICAL_CLIENT_ID/INFISICAL_CLIENT_SECRET required"; fail=1; fi
   fi
+  if [ "$(cfg .optional.cilium)" = true ] && ! kubectl -n kube-system get ds cilium >/dev/null 2>&1; then
+    local cni; cni=$(kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -Eo '^(kindnet|flannel|kube-flannel|calico|canal|weave|kube-router|aws-node|antrea)' | head -1 || true)
+    if [ -n "$cni" ]; then ko "optional.cilium=true but this cluster already has a CNI ($cni): set optional.cilium: false (Cilium is only for clusters created without a CNI)"; fail=1
+    else ok "no CNI found: Cilium will be installed"; fi
+  fi
   if [ "$fail" -eq 0 ]; then log "doctor: OK"; else log "doctor: some prerequisites are missing"; fi
   return "$fail"
 }
