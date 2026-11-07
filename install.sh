@@ -151,10 +151,10 @@ gen_values() {
 }
 # Install helm/platform/<name> once with Helm (same release name as ArgoCD, which then takes it over).
 helm_bootstrap() {
-  local name=$1 ns=$2 g; g=$(mktemp); gen_values > "$g"
+  local name=$1 ns=$2 g; shift 2; g=$(mktemp); gen_values > "$g"
   helm dependency update "$ROOT/helm/platform/$name" >/dev/null
   helm upgrade --install "$name" "$ROOT/helm/platform/$name" -n "$ns" --create-namespace \
-    -f "$ROOT/cluster.yaml" -f "$g" --wait --timeout 10m >/dev/null
+    -f "$ROOT/cluster.yaml" -f "$g" "$@" --wait --timeout 10m >/dev/null
   rm -f "$g"
 }
 # k3s (and some distros/addons) already run a metrics-server in kube-system with an immutable
@@ -288,7 +288,8 @@ install() {
 
   if grep -qx cilium <<<"$comps"; then
     log "Installing Cilium (CNI, before everything else; then managed by ArgoCD)"
-    helm_bootstrap cilium kube-system
+    # LB pool / L2 policy CRDs only exist once the Cilium operator runs: ArgoCD adds them right after.
+    helm_bootstrap cilium kube-system --set ciliumLB.enabled=false
     kubectl wait --for=condition=Ready nodes --all --timeout=5m >/dev/null
     ok "Cilium ready, nodes Ready"
   fi

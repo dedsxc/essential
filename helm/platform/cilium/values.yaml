@@ -1,6 +1,9 @@
 # Cilium: eBPF CNI, replaces kube-proxy, L2 load balancer IPs (no MetalLB).
 cilium:
   kubeProxyReplacement: true
+  # Service LB in the pod datapath too: required when nodes are containers (k3d, kind), harmless elsewhere
+  socketLB:
+    hostNamespaceOnly: true
   operator:
     replicas: 1
   bpf:
