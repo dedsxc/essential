@@ -2,7 +2,8 @@
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   name: selfsigned-bootstrap
 spec:
   selfSigned: {}
@@ -10,7 +11,8 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   name: selfsigned-ca
   namespace: cert-manager
 spec:
@@ -18,39 +20,55 @@ spec:
   commonName: kien-stack-ca
   secretName: selfsigned-ca
   duration: 87600h
-  privateKey: {algorithm: ECDSA, size: 256}
-  issuerRef: {name: selfsigned-bootstrap, kind: ClusterIssuer, group: cert-manager.io}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   name: selfsigned-ca
 spec:
-  ca: {secretName: selfsigned-ca}
+  ca:
+    secretName: selfsigned-ca
 {{- if hasPrefix "letsencrypt" .Values.global.tls.issuer }}
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   name: letsencrypt
 spec:
   acme:
     email: {{ .Values.global.tls.email }}
-    server: {{ if .Values.global.tls.staging }}https://acme-staging-v02.api.letsencrypt.org/directory{{ else }}https://acme-v02.api.letsencrypt.org/directory{{ end }}
-    privateKeySecretRef: {name: letsencrypt-account}
+    {{- if .Values.global.tls.staging }}
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    {{- else }}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    {{- end }}
+    privateKeySecretRef:
+      name: letsencrypt-account
     solvers:
       {{- if eq .Values.global.tls.issuer "letsencrypt-dns01" }}
       - dns01:
           {{- if eq .Values.global.tls.dns01.provider "cloudflare" }}
           cloudflare:
-            apiTokenSecretRef: {name: {{ .Values.global.tls.dns01.secretName }}, key: {{ .Values.global.tls.dns01.secretKey }}}
+            apiTokenSecretRef:
+              name: {{ .Values.global.tls.dns01.secretName }}
+              key: {{ .Values.global.tls.dns01.secretKey }}
           {{- else }}
           {{- fail (printf "dns01 provider non supporte: %s (utiliser cloudflare ou HTTP01)" .Values.global.tls.dns01.provider) }}
           {{- end }}
       {{- else }}
       - http01:
-          ingress: {ingressClassName: {{ .Values.global.ingressClass }}}
+          ingress:
+            ingressClassName: {{ .Values.global.ingressClass }}
       {{- end }}
 {{- end }}

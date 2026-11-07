@@ -7,19 +7,42 @@ infisical-standalone:
     kubeSecretRef: infisical-secrets
     extraEnv:
       - name: DB_CONNECTION_URI
-        valueFrom: {secretKeyRef: {name: infisical-pg-app, key: uri}}
+        valueFrom:
+          secretKeyRef:
+            name: infisical-pg-app
+            key: uri
     resources:
-      requests: {cpu: 100m, memory: 384Mi}
-      limits: {memory: 2Gi}   # 1Gi: OOMKilled during DB migrations on first start
-  ingress: {enabled: false, nginx: {enabled: false}}   # our own templates/ingress.yaml
-  postgresql: {enabled: false}
-  redis: {enabled: false}
-database: {size: 5Gi}
+      requests:
+        cpu: 100m
+        memory: 384Mi
+      limits:
+        # 1Gi was OOMKilled during DB migrations on first start
+        memory: 2Gi
+  # Ingress is in our own templates/ingress.yaml
+  ingress:
+    enabled: false
+    nginx:
+      enabled: false
+  postgresql:
+    enabled: false
+  redis:
+    enabled: false
+database:
+  size: 5Gi
 # global.* comes from /cluster.yaml (passed to every chart by the ApplicationSets). Defaults:
 global:
   domain: example.com
   issuer: selfsigned-ca
   ingressClass: traefik
   storageClass: ""
-  tls: {issuer: selfsigned, email: "", staging: false, dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}}
-  secrets: {provider: none, infisical: {}}
+  tls:
+    issuer: selfsigned
+    email: ""
+    staging: false
+    dns01:
+      provider: cloudflare
+      secretName: dns01-api-token
+      secretKey: api-token
+  secrets:
+    provider: none
+    infisical: {}

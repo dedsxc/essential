@@ -1,19 +1,33 @@
 argo-cd:
   configs:
-    params: {server.insecure: true}
+    params:
+      server.insecure: true
     cm:
       resource.exclusions: |
         - apiGroups: [cilium.io]
           kinds: [CiliumIdentity]
   server:
-    ingress: {enabled: false}   # templates/ingress.yaml (needs global.domain)
-  dex: {enabled: false}
-  notifications: {enabled: false}
+    # Ingress is in templates/ingress.yaml (needs global.domain)
+    ingress:
+      enabled: false
+  dex:
+    enabled: false
+  notifications:
+    enabled: false
 # global.* comes from /cluster.yaml (passed to every chart by the ApplicationSets). Defaults:
 global:
   domain: example.com
   issuer: selfsigned-ca
   ingressClass: traefik
   storageClass: ""
-  tls: {issuer: selfsigned, email: "", staging: false, dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}}
-  secrets: {provider: none, infisical: {}}
+  tls:
+    issuer: selfsigned
+    email: ""
+    staging: false
+    dns01:
+      provider: cloudflare
+      secretName: dns01-api-token
+      secretKey: api-token
+  secrets:
+    provider: none
+    infisical: {}

@@ -3,10 +3,14 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: infisical-pg
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   instances: 1
-  bootstrap: {initdb: {database: infisical, owner: infisical}}
+  bootstrap:
+    initdb:
+      database: infisical
+      owner: infisical
   storage:
     size: {{ .Values.database.size }}
     {{- with .Values.global.storageClass }}

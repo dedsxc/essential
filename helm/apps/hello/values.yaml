@@ -3,16 +3,29 @@ app-template:
   controller:
     containers:
       main:
-        image: {repository: nginx, tag: "1.27", digest: ""}
+        image:
+          repository: nginx
+          tag: "1.27"
+          digest: ""
   service:
     main:
-      ports: {http: {port: 80}}
+      ports:
+        http:
+          port: 80
   ingress:
     main:
       enabled: true
       className: traefik
-      annotations: {cert-manager.io/cluster-issuer: '{{ .Values.global.issuer }}'}
+      annotations:
+        cert-manager.io/cluster-issuer: '{{ .Values.global.issuer }}'
       hosts:
         - host: 'hello.{{ .Values.global.domain }}'
-          paths: [{path: /, service: {identifier: main, port: http}}]
-      tls: [{secretName: hello-tls, hosts: ['hello.{{ .Values.global.domain }}']}]
+          paths:
+            - path: /
+              service:
+                identifier: main
+                port: http
+      tls:
+        - secretName: hello-tls
+          hosts:
+            - 'hello.{{ .Values.global.domain }}'

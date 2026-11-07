@@ -7,16 +7,20 @@ metadata:
   namespace: argocd
 spec:
   goTemplate: true
-  goTemplateOptions: ["missingkey=error"]
+  goTemplateOptions:
+    - missingkey=error
   generators:
     - git:
         repoURL: https://github.com/dedsxc/kien-stack-essential.git
         revision: main
         directories:
           - path: "helm/platform/*"
-          # optional bricks: remove the line to enable
-          - {path: helm/platform/cilium, exclude: true}
-          - {path: helm/platform/external-dns, exclude: true}
+          # Optional bricks: remove the entry to enable
+          - path: helm/platform/cilium
+            exclude: true
+          - path: helm/platform/external-dns
+            exclude: true
+  # Per-app exceptions (target namespace)
   templatePatch: |
     {{- if eq .path.basename "cloudnative-pg" }}
     spec:
@@ -28,7 +32,8 @@ spec:
   template:
     metadata:
       name: "{{ .path.basename }}"
-      finalizers: [resources-finalizer.argocd.argoproj.io]
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
     spec:
       project: platform
       source:
@@ -37,11 +42,23 @@ spec:
         path: "{{ .path.path }}"
         helm:
           releaseName: "{{ .path.basename }}"
-          valueFiles: [values.yaml, ../../../cluster.yaml]   # your settings, see /cluster.yaml
+          # Your settings: see /cluster.yaml
+          valueFiles:
+            - values.yaml
+            - ../../../cluster.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{ .path.basename }}"
       syncPolicy:
-        automated: {prune: true, selfHeal: true}
-        retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 5m}}
-        syncOptions: [CreateNamespace=true, ServerSideApply=true]
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

@@ -6,7 +6,8 @@ apiVersion: cilium.io/v2alpha1
 kind: CiliumLoadBalancerIPPool
 metadata:
   name: kstack-pool
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   allowFirstLastIPs: "No"
   blocks:
@@ -17,7 +18,8 @@ apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
 metadata:
   name: kstack-l2
-  annotations: {argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   interfaces: {{ .interfaces | default (list "^eth[0-9]+" "^eno[0-9]+" "^enp[0-9]+s[0-9]+$") | toJson }}
   loadBalancerIPs: true

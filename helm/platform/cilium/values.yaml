@@ -1,18 +1,42 @@
 # Cilium: eBPF CNI, replaces kube-proxy, L2 load balancer IPs (no MetalLB).
 cilium:
   kubeProxyReplacement: true
-  operator: {replicas: 1}
-  bpf: {masquerade: true}
-  l2announcements: {enabled: true}
-  externalIPs: {enabled: true}
-  k8sClientRateLimit: {qps: 20, burst: 40}
-  hubble: {enabled: true, relay: {enabled: false}, ui: {enabled: false}}
-ciliumLB: {enabled: false, start: "", stop: ""}   # homelab L2 load balancer IPs
+  operator:
+    replicas: 1
+  bpf:
+    masquerade: true
+  l2announcements:
+    enabled: true
+  externalIPs:
+    enabled: true
+  k8sClientRateLimit:
+    qps: 20
+    burst: 40
+  hubble:
+    enabled: true
+    relay:
+      enabled: false
+    ui:
+      enabled: false
+# Homelab L2 load balancer IPs
+ciliumLB:
+  enabled: false
+  start: ""
+  stop: ""
 # global.* comes from /cluster.yaml (passed to every chart by the ApplicationSets). Defaults:
 global:
   domain: example.com
   issuer: selfsigned-ca
   ingressClass: traefik
   storageClass: ""
-  tls: {issuer: selfsigned, email: "", staging: false, dns01: {provider: cloudflare, secretName: dns01-api-token, secretKey: api-token}}
-  secrets: {provider: none, infisical: {}}
+  tls:
+    issuer: selfsigned
+    email: ""
+    staging: false
+    dns01:
+      provider: cloudflare
+      secretName: dns01-api-token
+      secretKey: api-token
+  secrets:
+    provider: none
+    infisical: {}
