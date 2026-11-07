@@ -50,3 +50,17 @@ PRs that change the Renovate config are validated by the same workflow (`Validat
 
 `.github/workflows/labeler.yaml` labels PRs by area (`platform`, `apps`, `argocd`, `ci`, `docs`,
 `installer`) from `.github/labeler.yaml`.
+
+## Releases
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please)
+(`.github/workflows/release.yaml`).
+
+1. Write commits with [Conventional Commits](https://www.conventionalcommits.org/): `feat: ...`, `fix: ...`, `deps: ...`.
+2. On every push to `main`, release-please opens or updates a **release PR** with the next version and the changelog.
+3. Merge the release PR: the `vX.Y.Z` tag and the GitHub release are created.
+
+Before 1.0.0, `feat` and `fix` bump the patch version, and breaking changes (`feat!:`) bump the minor.
+Optional secret `RELEASE_TOKEN` (PAT or GitHub App token): without it the release PR is opened
+with the default token and CI checks do not run on it automatically.
+Repo setting required: *Settings > Actions > General > Allow GitHub Actions to create and approve pull requests*.
