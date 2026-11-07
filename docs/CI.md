@@ -61,6 +61,6 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 3. Merge the release PR: the `vX.Y.Z` tag and the GitHub release are created.
 
 Before 1.0.0, `feat` and `fix` bump the patch version, and breaking changes (`feat!:`) bump the minor.
-Optional secret `RELEASE_TOKEN` (PAT or GitHub App token): without it the release PR is opened
+Optional GitHub App (secrets `BOT_APP_ID` + `BOT_APP_PRIV_KEY`, app installed on the repo with Contents + Pull requests write): without it the release PR is opened
 with the default token and CI checks do not run on it automatically.
 Repo setting required: *Settings > Actions > General > Allow GitHub Actions to create and approve pull requests*.
