@@ -42,24 +42,31 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
 ## How the repo is organised
 
 ```
-argocd/                         app-of-apps (a Helm chart rendered by ArgoCD)
-  templates/platform/traefik.yaml    -> Application -> helm/platform/traefik
-  templates/platform/argocd.yaml     -> Application -> helm/platform/argocd (ArgoCD manages itself)
-  templates/platform/...             one file per platform brick
-  templates/applications.yaml        ApplicationSet: one Application per helm/apps/* folder
+argocd/
+  app-of-apps.yaml              the only thing install.sh applies: watches argocd/applications
+  applications/
+    kustomization.yaml          resources: [platform, apps]
+    platform/                   AppProject + ApplicationSet: one Application per helm/platform/* folder
+    apps/                       AppProject + ApplicationSet: one Application per helm/apps/* folder
 helm/
   platform/<brick>/             Helm chart: Chart.yaml (upstream chart as dependency), values.yaml, templates/
   apps/<your-app>/              your apps (see helm/apps/hello, based on app-template)
-stack.example.yaml              your settings (domain, TLS, Git repo...), passed to argocd/
+cluster.yaml                    settings read by every chart (global.domain, global.issuer...)
+stack.example.yaml              installer answers (domain, TLS, Git repo...)
 ```
 
-1. `install.sh` installs ArgoCD with Helm (from `helm/platform/argocd`), then applies **one** Application,
-   `root`, pointing to `argocd/` with your `stack.yaml` as values.
-2. `root` renders one Application per file in `argocd/templates/platform/`. Each one deploys a chart from
-   `helm/platform/`. ArgoCD then takes over its own install.
-3. The `apps` ApplicationSet creates an Application per folder in `helm/apps/`.
+Plain ArgoCD YAML, no templating on the ArgoCD side. Exceptions (namespace, sync options) live in the
+`templatePatch` of each ApplicationSet. Optional bricks (`cilium`, `external-dns`) are excluded in
+`applications/platform/appset.yaml`: remove the `exclude` line to enable them.
 
-Every chart receives `global.domain`, `global.issuer`, `global.ingressClass`, `global.storageClass`.
+`install.sh` installs ArgoCD once with Helm (`helm/platform/argocd`), then applies `app-of-apps`. It injects
+your repo URL, branch and settings (from `stack.yaml`) into the ApplicationSets as a kustomize patch,
+so the files in Git stay generic.
+
+### Add your own ApplicationSet
+
+Copy `argocd/applications/apps/` to `argocd/applications/<name>/`, change the folder pattern in
+`appset.yaml`, add `<name>` to `argocd/applications/kustomization.yaml`, push.
 
 ### Deploy your app
 
@@ -74,7 +81,7 @@ ArgoCD creates the `my-site` Application in the `my-site` namespace. Delete the 
 
 - Tune a brick: edit `helm/platform/<brick>/values.yaml` (upstream values go under the dependency name).
 - Upgrade a brick: bump the version in `helm/platform/<brick>/Chart.yaml`.
-- Add a brick: create `helm/platform/<brick>/` and `argocd/templates/platform/<brick>.yaml`.
+- Add a brick: create `helm/platform/<brick>/` (namespace = folder name, or add an exception in `templatePatch`).
 
 Private repo: set `GIT_USERNAME` / `GIT_TOKEN` when installing.
 Validate offline: `bash hack/validate.sh stack.yaml` (helm template + kubeconform on every chart).
