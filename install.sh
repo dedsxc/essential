@@ -239,6 +239,9 @@ install() {
     -f "$avals" --wait --timeout 10m >/dev/null
   rm -f "$avals"
   ok "ArgoCD $aver ready"
+  local pw; pw=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+  log "ArgoCD login: admin / ${pw:-<see argocd-initial-admin-secret>}"
+  log "  UI now (no ingress needed): kubectl -n argocd port-forward svc/argocd-server 8080:443  ->  https://localhost:8080"
 
   if [ -n "${GIT_TOKEN:-}" ]; then
     kubectl -n argocd apply -f - >/dev/null <<YAML
