@@ -3,9 +3,9 @@
 # https://raw.githubusercontent.com/kien-stack/essential/main/scripts/install.sh fills it in for you on the first install.
 global:
   # Apps get <name>.<domain>, e.g. argocd.example.com. No domain? <node-ip>.sslip.io
-  domain: example.com
+  domain: demo.kien.cc
   # ClusterIssuer of the Gateway certificates: selfsigned-ca | letsencrypt
-  issuer: selfsigned-ca
+  issuer: letsencrypt
   ingressClass: traefik
   # Apps exposed on the Gateway (traefik/traefik): one HTTPS listener + certificate <app>.<domain> each.
   # Your own app in helm/apps/<app>: add it here, then an HTTPRoute (app-template "route:", see hello).
@@ -15,9 +15,9 @@ global:
     - hello
   tls:
     # selfsigned | letsencrypt-http01 | letsencrypt-dns01 (then issuer: letsencrypt)
-    issuer: selfsigned
-    email: admin@example.com
-    staging: false
+    issuer: letsencrypt-dns01
+    email: admin@kien.cc
+    staging: true
     dns01:
       provider: cloudflare
       secretName: dns01-api-token
@@ -30,7 +30,6 @@ global:
       projectSlug: my-project
       environmentSlug: prod
       credentialsSecret: infisical-universal-auth
-
 # Per-brick settings (key = upstream chart name, same as in helm/platform/<brick>/values.yaml).
 traefik:
   service:
@@ -42,7 +41,6 @@ traefik:
   #   kubernetesIngress:
   #     publishedService: {enabled: false}
   #     ingressEndpoint: {ip: 192.168.1.10}
-
 # OpenEBS hostpath as the default StorageClass (cluster without one)
 # openebs:
 #   localpv-provisioner:
