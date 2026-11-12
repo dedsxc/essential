@@ -20,7 +20,7 @@ APP="$ROOT/argocd/app-of-apps.yaml"
 APPSET="$ROOT/argocd/applications/platform/appset.yaml"
 PACK=essential
 CMD=install
-ARGOCD_TIMEOUT=${ARGOCD_TIMEOUT:-600s}
+ARGOCD_TIMEOUT=${ARGOCD_TIMEOUT:-0}   # seconds to wait for the apps, 0 = until ready
 
 log()  { printf '\033[1;34m[kien/stack]\033[0m %s\n' "$*"; }
 ok()   { printf '  \033[32mOK\033[0m   %s\n' "$*"; }
@@ -258,27 +258,50 @@ YAML
 }
 
 wait_apps() {
-  local comps=$1 deadline=$(( $(date +%s) + ${ARGOCD_TIMEOUT%s} )) pending
-  log "Waiting for Synced/Healthy (timeout $ARGOCD_TIMEOUT)"
+  # ArgoCD deploys every app in parallel; this shows each app's status until all are ready (no time limit by
+  # default, ARGOCD_TIMEOUT=<seconds> to cap it). Ctrl+C is safe: ArgoCD keeps deploying.
+  # Terminal: one line per app, redrawn in place only when a status changes. CI/pipe: one line per change.
+  local comps=$1 timeout=${ARGOCD_TIMEOUT%s} apps a n=0 w=12 start=$SECONDS
+  apps="app-of-apps $comps"
+  for a in $apps; do n=$((n + 1)); if [ ${#a} -ge $w ]; then w=$(( ${#a} + 2 )); fi; done
+  local tty=""; if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then tty=1; fi
+  log "Deploying $n apps with ArgoCD (Ctrl+C is safe: ArgoCD keeps going)"
+  local rc=0 prev="" el=0 j st data out row pending
+  local -a last=()
   while :; do
-    pending=""
-    for a in app-of-apps $comps; do
-      local st
-      st=$(kubectl -n argocd get application "$a" -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
-      [ "$st" = Synced/Healthy ] || pending="$pending $a(${st:-absent})"
-    done
-    [ -z "$pending" ] && { ok "all applications are Synced/Healthy"; return 0; }
-    if [ "$(date +%s)" -ge "$deadline" ]; then
-      warn "not ready yet:$pending"
-      if [ -z "$(kubectl -n traefik get svc traefik -o jsonpath='{.status.loadBalancer.ingress}' 2>/dev/null)" ] \
-         && [ "$(kubectl -n traefik get svc traefik -o jsonpath='{.spec.type}' 2>/dev/null)" = LoadBalancer ]; then
-        warn "Traefik is waiting for a load balancer IP: this cluster does not provide one."
-        warn "  -> minikube: 'minikube tunnel'; homelab: Cilium L2 (ciliumLB in cluster.yaml) or traefik NodePort"
+    data=$'\n'$(kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}={.status.sync.status}/{.status.health.status}{"\n"}{end}' 2>/dev/null || true)
+    el=$(( SECONDS - start )); out=""; pending=0; j=0
+    for a in $apps; do
+      j=$((j + 1)); st=""
+      if [[ "$data" == *$'\n'"$a="* ]]; then st=${data#*$'\n'"$a="}; st=${st%%$'\n'*}; fi
+      case "$st" in
+        Synced/Healthy) row=$'\033[32mOK\033[0m' ;;
+        */Degraded)     row=$'\033[33mDegraded\033[0m'; pending=$((pending + 1)) ;;
+        ""|/|*/)        row="Pending"; pending=$((pending + 1)) ;;
+        */Healthy)      row="Syncing"; pending=$((pending + 1)) ;;
+        *)              row="${st#*/}"; pending=$((pending + 1)) ;;
+      esac
+      if [ -n "$tty" ]; then
+        printf -v row '  %-*s %s\033[K\n' "$w" "$a" "$row"; out+=$row
+      elif [ "${last[j]:-}" != "$row" ]; then
+        printf '  %-*s %s\n' "$w" "$a" "$row"; last[j]=$row
       fi
-      return 1
+    done
+    if [ -n "$tty" ] && [ "$out" != "$prev" ]; then
+      if [ -n "$prev" ]; then printf '\033[%dA' "$n"; fi
+      printf '%s' "$out"; prev=$out
     fi
-    sleep 15
+    if [ "$pending" -eq 0 ]; then break; fi
+    if [ "${timeout:-0}" -gt 0 ] && [ "$el" -ge "$timeout" ]; then rc=1; break; fi
+    sleep 2
   done
+  if [ "$rc" -eq 0 ]; then ok "all $n apps are ready ($(( el / 60 )) min $(( el % 60 )) s)"; return 0; fi
+  warn "still not ready after ${timeout}s (ArgoCD keeps deploying: kubectl -n argocd get applications)"
+  if [ -z "$(kubectl -n traefik get svc traefik -o jsonpath='{.status.loadBalancer.ingress}' 2>/dev/null)" ] \
+     && [ "$(kubectl -n traefik get svc traefik -o jsonpath='{.spec.type}' 2>/dev/null)" = LoadBalancer ]; then
+    warn "Traefik has no load balancer IP: minikube -> 'minikube tunnel'; homelab -> Cilium L2 (ciliumLB) or NodePort"
+  fi
+  return 1
 }
 
 summary() {
